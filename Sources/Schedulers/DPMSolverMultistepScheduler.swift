@@ -93,7 +93,6 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         assert(modelOutput.scalarCount == sample.scalarCount)
         let scalarCount = modelOutput.scalarCount
         let (alpha_t, sigma_t) = (self.alpha_t[timestep], self.sigma_t[timestep])
-        
         // This could be optimized with a Metal kernel if we find we need to
         switch predictionType {
         case .epsilon:

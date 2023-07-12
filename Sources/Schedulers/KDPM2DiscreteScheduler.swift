@@ -147,9 +147,7 @@ public final class KDPM2DiscreteScheduler: Scheduler {
         let scale: Float32 = pow(pow(sigma, 2) + 1, 0.5)
         return MLShapedArray(unsafeUninitializedShape: sample.shape) { scalars, _ in
             sample.withUnsafeShapedBufferPointer { sample, _, _ in
-                for i in 0..<scalarCount {
-                    scalars.initializeElement(at: i, to: sample[i] / scale)
-                }
+                vDSP.divide(sample, scale, result: &scalars)
             }
         }
     }
