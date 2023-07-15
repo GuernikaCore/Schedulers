@@ -249,9 +249,9 @@ public final class KDPM2DiscreteScheduler: Scheduler {
     public func addNoise(
         originalSample: MLShapedArray<Float32>,
         noise: [MLShapedArray<Float32>],
-        timeStep t: Double
+        timeStep t: Double?
     ) -> [MLShapedArray<Float32>] {
-        let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
+        let stepIndex = t.flatMap { timeSteps.firstIndex(of: $0) } ?? 0
         let sigma = Float32(sigmas[stepIndex])
         let noisySamples = noise.map { noise in
             MLShapedArray(unsafeUninitializedShape: originalSample.shape) { scalars, _ in

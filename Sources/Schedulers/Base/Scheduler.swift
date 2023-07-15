@@ -52,7 +52,7 @@ public protocol Scheduler {
     func addNoise(
         originalSample: MLShapedArray<Float32>,
         noise: [MLShapedArray<Float32>],
-        timeStep t: Double
+        timeStep t: Double?
     ) -> [MLShapedArray<Float32>]
 }
 
@@ -65,11 +65,18 @@ public extension Scheduler {
     
     func addNoise(
         originalSample: MLShapedArray<Float32>,
-        noise: [MLShapedArray<Float32>],
-        timeStep t: Double
+        noise: [MLShapedArray<Float32>]
     ) -> [MLShapedArray<Float32>] {
-        let timeStep = Int(t)
-        let alphaProdt = alphasCumProd[Int(timeSteps[timeStep])]
+        return addNoise(originalSample: originalSample, noise: noise, timeStep: nil)
+    }
+    
+    func addNoise(
+        originalSample: MLShapedArray<Float32>,
+        noise: [MLShapedArray<Float32>],
+        timeStep t: Double?
+    ) -> [MLShapedArray<Float32>] {
+        let timeStep: Int = t.map { Int($0) } ?? Int(timeSteps[0])
+        let alphaProdt = alphasCumProd[timeStep]
         let betaProdt = 1 - alphaProdt
         let sqrtAlphaProdt = sqrt(alphaProdt)
         let sqrtBetaProdt = sqrt(betaProdt)
