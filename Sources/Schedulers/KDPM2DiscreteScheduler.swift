@@ -143,7 +143,6 @@ public final class KDPM2DiscreteScheduler: Scheduler {
     public func scaleModelInput(timeStep: Double, sample: MLShapedArray<Float32>) -> MLShapedArray<Float32> {
         let stepIndex = indexForTimestep(timeStep)
         let sigma: Float32 = Float32(stateInFirstOrder ? sigmas[stepIndex] : sigmasInterpol[stepIndex])
-        let scalarCount = sample.scalarCount
         let scale: Float32 = pow(pow(sigma, 2) + 1, 0.5)
         return MLShapedArray(unsafeUninitializedShape: sample.shape) { scalars, _ in
             sample.withUnsafeShapedBufferPointer { sample, _, _ in
@@ -249,9 +248,11 @@ public final class KDPM2DiscreteScheduler: Scheduler {
     
     public func addNoise(
         originalSample: MLShapedArray<Float32>,
-        noise: [MLShapedArray<Float32>]
+        noise: [MLShapedArray<Float32>],
+        timeStep t: Double
     ) -> [MLShapedArray<Float32>] {
-        let sigma = Float32(sigmas[0])
+        let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
+        let sigma = Float32(sigmas[stepIndex])
         let noisySamples = noise.map { noise in
             MLShapedArray(unsafeUninitializedShape: originalSample.shape) { scalars, _ in
                 originalSample.withUnsafeShapedBufferPointer { sample, _, _ in
