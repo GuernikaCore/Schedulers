@@ -23,6 +23,8 @@ public final class DDIMScheduler: Scheduler {
     public let alphasCumProd: [Float]
     public let timeSteps: [Double]
     public let predictionType: PredictionType
+    
+    public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
 
     /// Create a scheduler that uses a pseudo linear multi-step (PLMS)  method
     ///
@@ -142,6 +144,9 @@ public final class DDIMScheduler: Scheduler {
                 }
             }
         }
+        
+        modelOutputs.removeAll(keepingCapacity: true)
+        modelOutputs.append(predOriginalSample)
         
         // 4. compute "direction pointing to x_t" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
         let predSampleDirectionAux = pow(1 - alphaProdtPrev, 0.5)

@@ -30,6 +30,8 @@ public final class KDPM2DiscreteScheduler: Scheduler {
     public let predictionType: PredictionType
     public let initNoiseSigma: Float
     
+    public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
+    
     private(set) var sample: MLShapedArray<Float32>?
     private var stateInFirstOrder: Bool { sample == nil }
     
@@ -202,6 +204,9 @@ public final class KDPM2DiscreteScheduler: Scheduler {
                 }
             }
         }
+        
+        modelOutputs.removeAll(keepingCapacity: true)
+        modelOutputs.append(predOriginalSample)
         
         let prevSample: MLShapedArray<Float32>
         if stateInFirstOrder {

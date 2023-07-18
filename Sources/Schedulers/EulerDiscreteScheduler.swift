@@ -27,6 +27,8 @@ public final class EulerDiscreteScheduler: Scheduler {
     public let sigmas: [Double]
     public let predictionType: PredictionType
     public let initNoiseSigma: Float
+    
+    public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
 
     /// Create a scheduler that uses a pseudo linear multi-step (PLMS)  method
     ///
@@ -122,6 +124,9 @@ public final class EulerDiscreteScheduler: Scheduler {
                 }
             }
         }
+        
+        modelOutputs.removeAll(keepingCapacity: true)
+        modelOutputs.append(predOriginalSample)
         
         // 2. Convert to an ODE derivative
         let dt: Float32 = Float32(sigmas[stepIndex + 1]) - sigma

@@ -31,6 +31,9 @@ public protocol Scheduler {
     /// Standard deviation of the initial noise distribution
     var initNoiseSigma: Float { get }
     
+    /// Denoised latents
+    var modelOutputs: [MLShapedArray<Float32>] { get }
+    
     func scaleModelInput(timeStep: Double, sample: MLShapedArray<Float32>) -> MLShapedArray<Float32>
 
     /// Compute a de-noised image sample and step scheduler state

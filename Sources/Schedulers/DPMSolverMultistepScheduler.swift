@@ -41,7 +41,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
     public let useLowerOrderFinal = true
     
     // Stores solverOrder (2) items
-    private(set) var modelOutputs: [MLShapedArray<Float32>] = []
+    public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
 
     /// Create a scheduler that uses a second order DPM-Solver++ algorithm.
     ///
@@ -118,7 +118,6 @@ public final class DPMSolverMultistepScheduler: Scheduler {
                 }
             }
         }
-        
     }
 
     /// One step for the first-order DPM-Solver (equivalent to DDIM).
@@ -136,7 +135,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         let h = p_lambda_t - lambda_s
         // x_t = (sigma_t / sigma_s) * sample - (alpha_t * (torch.exp(-h) - 1.0)) * model_output
         let x_t = [sample, modelOutput].weightedSum(
-            [p_sigma_t / sigma_s, -p_alpha_t * (exp(-h) - 1)]
+            [p_sigma_t / sigma_s, -p_alpha_t * expm1(-h)]
         )
         return x_t
     }
@@ -168,7 +167,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         //     - 0.5 * (alpha_t * (torch.exp(-h) - 1.0)) * D1
         // )
         let x_t = [sample, D0, D1].weightedSum(
-            [p_sigma_t/sigma_s0, -p_alpha_t * (exp(-h) - 1), -0.5 * p_alpha_t * (exp(-h) - 1)]
+            [p_sigma_t/sigma_s0, -p_alpha_t * expm1(-h), -0.5 * p_alpha_t * expm1(-h)]
         )
         return x_t
     }

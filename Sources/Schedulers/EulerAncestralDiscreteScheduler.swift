@@ -27,6 +27,8 @@ public final class EulerAncestralDiscreteScheduler: Scheduler {
     public let sigmas: [Double]
     public let predictionType: PredictionType
     public let initNoiseSigma: Float
+    
+    public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
 
     /// Create a scheduler that uses a pseudo linear multi-step (PLMS)  method
     ///
@@ -131,6 +133,9 @@ public final class EulerAncestralDiscreteScheduler: Scheduler {
                 }
             }
         }
+        
+        modelOutputs.removeAll(keepingCapacity: true)
+        modelOutputs.append(predOriginalSample)
         
         let sigmaFrom: Float32 = Float32(sigmas[stepIndex])
         let sigmaTo: Float32 = Float32(sigmas[stepIndex + 1])
