@@ -21,9 +21,9 @@ import RandomGenerator
 public final class KDPM2DiscreteScheduler: Scheduler {
     public let trainStepCount: Int
     public let inferenceStepCount: Int
-    public let betas: [Float]
-    public let alphas: [Float]
-    public let alphasCumProd: [Float]
+    public let betas: [Double]
+    public let alphas: [Double]
+    public let alphasCumProd: [Double]
     public let timeSteps: [Double]
     public let sigmas: [Double]
     public let sigmasInterpol: [Double]
@@ -49,8 +49,8 @@ public final class KDPM2DiscreteScheduler: Scheduler {
         stepCount: Int = 50,
         trainStepCount: Int = 1000,
         betaSchedule: BetaSchedule = .scaledLinear,
-        betaStart: Float = 0.00085,
-        betaEnd: Float = 0.012,
+        betaStart: Double = 0.00085,
+        betaEnd: Double = 0.012,
         predictionType: PredictionType = .epsilon
     ) {
         self.trainStepCount = trainStepCount

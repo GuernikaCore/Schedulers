@@ -14,7 +14,7 @@ public enum BetaSchedule {
     /// Steps using linspace(sqrt(start),sqrt(end))^2
     case scaledLinear
     
-    func betas(betaStart: Float, betaEnd: Float, trainStepCount: Int) -> [Float] {
+    func betas(betaStart: Double, betaEnd: Double, trainStepCount: Int) -> [Double] {
         switch self {
         case .linear:
             return linspace(betaStart, betaEnd, trainStepCount)

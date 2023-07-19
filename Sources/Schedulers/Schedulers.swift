@@ -37,8 +37,8 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
         stepCount: Int = 50,
         trainStepCount: Int = 1000,
         betaSchedule: BetaSchedule = .scaledLinear,
-        betaStart: Float = 0.00085,
-        betaEnd: Float = 0.012,
+        betaStart: Double = 0.00085,
+        betaEnd: Double = 0.012,
         predictionType: PredictionType = .epsilon
     ) -> any Scheduler {
         switch self {

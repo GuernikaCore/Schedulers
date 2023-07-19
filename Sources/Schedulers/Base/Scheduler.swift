@@ -20,13 +20,13 @@ public protocol Scheduler {
     var timeSteps: [Double] { get }
 
     /// Schedule of betas which controls the amount of noise added at each timestep
-    var betas: [Float] { get }
+    var betas: [Double] { get }
 
     /// 1 - betas
-    var alphas: [Float] { get }
+    var alphas: [Double] { get }
 
     /// Cached cumulative product of alphas
-    var alphasCumProd: [Float] { get }
+    var alphasCumProd: [Double] { get }
 
     /// Standard deviation of the initial noise distribution
     var initNoiseSigma: Float { get }

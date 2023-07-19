@@ -18,9 +18,9 @@ import RandomGenerator
 public final class DDIMScheduler: Scheduler {
     public let trainStepCount: Int
     public let inferenceStepCount: Int
-    public let betas: [Float]
-    public let alphas: [Float]
-    public let alphasCumProd: [Float]
+    public let betas: [Double]
+    public let alphas: [Double]
+    public let alphasCumProd: [Double]
     public let timeSteps: [Double]
     public let predictionType: PredictionType
     
@@ -40,8 +40,8 @@ public final class DDIMScheduler: Scheduler {
         stepCount: Int = 50,
         trainStepCount: Int = 1000,
         betaSchedule: BetaSchedule = .scaledLinear,
-        betaStart: Float = 0.00085,
-        betaEnd: Float = 0.012,
+        betaStart: Double = 0.00085,
+        betaEnd: Double = 0.012,
         predictionType: PredictionType = .epsilon
     ) {
         self.trainStepCount = trainStepCount
@@ -110,8 +110,8 @@ public final class DDIMScheduler: Scheduler {
         let predEpsilon: MLShapedArray<Float32>
         switch predictionType {
         case .epsilon:
-            let alphaProdtPow = pow(alphaProdt, 0.5)
-            let betaProdtPow = pow(betaProdt, 0.5)
+            let alphaProdtPow = Float32(pow(alphaProdt, 0.5))
+            let betaProdtPow = Float32(pow(betaProdt, 0.5))
             predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in
@@ -123,8 +123,8 @@ public final class DDIMScheduler: Scheduler {
             }
             predEpsilon = output
         case .vPrediction:
-            let alphaProdtPow = pow(alphaProdt, 0.5)
-            let betaProdtPow = pow(betaProdt, 0.5)
+            let alphaProdtPow = Float32(pow(alphaProdt, 0.5))
+            let betaProdtPow = Float32(pow(betaProdt, 0.5))
             predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in
@@ -149,10 +149,10 @@ public final class DDIMScheduler: Scheduler {
         modelOutputs.append(predOriginalSample)
         
         // 4. compute "direction pointing to x_t" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
-        let predSampleDirectionAux = pow(1 - alphaProdtPrev, 0.5)
+        let predSampleDirectionAux = Float32(pow(1 - alphaProdtPrev, 0.5))
         
         // 5. compute x_t without "random noise" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
-        let prevSampleAux = pow(alphaProdtPrev, 0.5)
+        let prevSampleAux = Float32(pow(alphaProdtPrev, 0.5))
         
         return MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
             predOriginalSample.withUnsafeShapedBufferPointer { original, _, _ in

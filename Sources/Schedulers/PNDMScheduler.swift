@@ -18,15 +18,15 @@ import RandomGenerator
 public final class PNDMScheduler: Scheduler {
     public let trainStepCount: Int
     public let inferenceStepCount: Int
-    public let betas: [Float]
-    public let alphas: [Float]
-    public let alphasCumProd: [Float]
+    public let betas: [Double]
+    public let alphas: [Double]
+    public let alphasCumProd: [Double]
     public let timeSteps: [Double]
     public let predictionType: PredictionType
     
-    public let alpha_t: [Float]
-    public let sigma_t: [Float]
-    public let lambda_t: [Float]
+    public let alpha_t: [Double]
+    public let sigma_t: [Double]
+    public let lambda_t: [Double]
 
     public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
 
@@ -49,8 +49,8 @@ public final class PNDMScheduler: Scheduler {
         stepCount: Int = 50,
         trainStepCount: Int = 1000,
         betaSchedule: BetaSchedule = .scaledLinear,
-        betaStart: Float = 0.00085,
-        betaEnd: Float = 0.012,
+        betaStart: Double = 0.00085,
+        betaEnd: Double = 0.012,
         predictionType: PredictionType = .epsilon
     ) {
         self.trainStepCount = trainStepCount
@@ -65,14 +65,14 @@ public final class PNDMScheduler: Scheduler {
         }
         self.alphasCumProd = alphasCumProd
         let stepsOffset = 1 // For stable diffusion
-        let stepRatio = Float(trainStepCount / stepCount )
+        let stepRatio = Float(trainStepCount / stepCount)
         let forwardSteps = (0..<stepCount).map {
             Int((Float($0) * stepRatio).rounded()) + stepsOffset
         }
         
         // Currently we only support VP-type noise shedule
         self.alpha_t = vForce.sqrt(self.alphasCumProd)
-        self.sigma_t = vForce.sqrt(vDSP.subtract([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
+        self.sigma_t = vForce.sqrt(vDSP.subtract([Double](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
         self.lambda_t = zip(self.alpha_t, self.sigma_t).map { α, σ in log(α) - log(σ) }
 
         var timeSteps: [Int] = []
@@ -146,7 +146,7 @@ public final class PNDMScheduler: Scheduler {
     func convertModelOutput(modelOutput: MLShapedArray<Float32>, timestep: Int, sample: MLShapedArray<Float32>) -> MLShapedArray<Float32> {
         assert(modelOutput.scalarCount == sample.scalarCount)
         let scalarCount = modelOutput.scalarCount
-        let (alpha_t, sigma_t) = (self.alpha_t[timestep], self.sigma_t[timestep])
+        let (alpha_t, sigma_t) = (Float32(self.alpha_t[timestep]), Float32(self.sigma_t[timestep]))
         // This could be optimized with a Metal kernel if we find we need to
         switch predictionType {
         case .epsilon:
@@ -218,8 +218,8 @@ public final class PNDMScheduler: Scheduler {
             break
         case .vPrediction:
             let scalarCount = modelOutput.scalarCount
-            let alphaProdtPow = pow(alphaProdt, 0.5)
-            let betaProdtPow = pow(betaProdt, 0.5)
+            let alphaProdtPow = Float32(pow(alphaProdt, 0.5))
+            let betaProdtPow = Float32(pow(betaProdt, 0.5))
             output = MLShapedArray(unsafeUninitializedShape: modelOutput.shape) { scalars, _ in
                 assert(scalars.count == scalarCount)
                 modelOutput.withUnsafeShapedBufferPointer { modelOutput, _, _ in
