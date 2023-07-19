@@ -56,7 +56,7 @@ public final class DDIMScheduler: Scheduler {
         }
         self.alphasCumProd = alphasCumProd
         let stepsOffset = 1 // For stable diffusion
-        let stepRatio = Float(trainStepCount / stepCount )
+        let stepRatio = Float(trainStepCount / stepCount)
         let forwardSteps = (0..<stepCount).map {
             Int((Float($0) * stepRatio).rounded()) + stepsOffset
         }
@@ -110,26 +110,32 @@ public final class DDIMScheduler: Scheduler {
         let predEpsilon: MLShapedArray<Float32>
         switch predictionType {
         case .epsilon:
-            let alphaProdtPow = Float32(pow(alphaProdt, 0.5))
-            let betaProdtPow = Float32(pow(betaProdt, 0.5))
+            let alphaProdtPow = pow(alphaProdt, 0.5)
+            let betaProdtPow = pow(betaProdt, 0.5)
             predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in
                         for i in 0..<scalarCount {
-                            scalars.initializeElement(at: i, to: (sample[i] - betaProdtPow * output[i]) / alphaProdtPow)
+                            scalars.initializeElement(
+                                at: i,
+                                to: Float32((Double(sample[i]) - betaProdtPow * Double(output[i])) / alphaProdtPow)
+                            )
                         }
                     }
                 }
             }
             predEpsilon = output
         case .vPrediction:
-            let alphaProdtPow = Float32(pow(alphaProdt, 0.5))
-            let betaProdtPow = Float32(pow(betaProdt, 0.5))
+            let alphaProdtPow = pow(alphaProdt, 0.5)
+            let betaProdtPow = pow(betaProdt, 0.5)
             predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in
                         for i in 0..<scalarCount {
-                            scalars.initializeElement(at: i, to: alphaProdtPow * sample[i] - betaProdtPow * output[i])
+                            scalars.initializeElement(
+                                at: i,
+                                to: Float32(alphaProdtPow * Double(sample[i]) - betaProdtPow * Double(output[i]))
+                            )
                         }
                     }
                 }
@@ -138,7 +144,10 @@ public final class DDIMScheduler: Scheduler {
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in
                         for i in 0..<scalarCount {
-                            scalars.initializeElement(at: i, to: alphaProdtPow * output[i] + betaProdtPow * sample[i])
+                            scalars.initializeElement(
+                                at: i,
+                                to: Float32(alphaProdtPow * Double(output[i]) + betaProdtPow * Double(sample[i]))
+                            )
                         }
                     }
                 }
@@ -149,17 +158,20 @@ public final class DDIMScheduler: Scheduler {
         modelOutputs.append(predOriginalSample)
         
         // 4. compute "direction pointing to x_t" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
-        let predSampleDirectionAux = Float32(pow(1 - alphaProdtPrev, 0.5))
+        let predSampleDirectionAux = pow(1 - alphaProdtPrev, 0.5)
         
         // 5. compute x_t without "random noise" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
-        let prevSampleAux = Float32(pow(alphaProdtPrev, 0.5))
+        let prevSampleAux = pow(alphaProdtPrev, 0.5)
         
         return MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
             predOriginalSample.withUnsafeShapedBufferPointer { original, _, _ in
                 predEpsilon.withUnsafeShapedBufferPointer { epsilon, _, _ in
                     for i in 0..<scalarCount {
-                        let sampleDirection = predSampleDirectionAux * epsilon[i]
-                        scalars.initializeElement(at: i, to: prevSampleAux * original[i] + sampleDirection)
+                        let sampleDirection = predSampleDirectionAux * Double(epsilon[i])
+                        scalars.initializeElement(
+                            at: i,
+                            to: Float32(prevSampleAux * Double(original[i]) + sampleDirection)
+                        )
                     }
                 }
             }
