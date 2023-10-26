@@ -1,0 +1,152 @@
+//
+//  LCMScheduler.swift
+//
+//
+//  Created by Guillermo Cique Fernández on 26/10/23.
+//
+
+import CoreML
+import Accelerate
+import RandomGenerator
+
+/// A scheduler used to compute a de-noised image
+///
+///  This implementation matches:
+///  [Hugging Face Diffusers LCMScheduler](https://github.com/huggingface/diffusers/blob/main/src/diffusers/schedulers/scheduling_lcm.py)
+///
+/// This scheduler extends the denoising procedure introduced in denoising diffusion probabilistic models (DDPMs) with
+/// non-Markovian guidance
+public final class LCMScheduler: Scheduler {
+    public let trainStepCount: Int
+    public let inferenceStepCount: Int
+    public let betas: [Float]
+    public let alphas: [Float]
+    public let alphasCumProd: [Float]
+    public let timeSteps: [Double]
+    public let predictionType: PredictionType
+    
+    public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
+    
+    /// Create a scheduler that uses a pseudo linear multi-step (PLMS)  method
+    ///
+    /// - Parameters:
+    ///   - stepCount: Number of inference steps to schedule
+    ///   - originalStepCount: The original number of inference steps
+    ///   - trainStepCount: Number of training diffusion steps
+    ///   - betaSchedule: Method to schedule betas from betaStart to betaEnd
+    ///   - betaStart: The starting value of beta for inference
+    ///   - betaEnd: The end value for beta for inference
+    /// - Returns: A scheduler ready for its first step
+    public init(
+        strength: Float? = nil,
+        stepCount: Int = 4,
+        originalStepCount: Int = 50,
+        trainStepCount: Int = 1000,
+        betaSchedule: BetaSchedule = .scaledLinear,
+        betaStart: Float = 0.00085,
+        betaEnd: Float = 0.012,
+        predictionType: PredictionType = .epsilon
+    ) {
+        self.trainStepCount = trainStepCount
+        self.inferenceStepCount = originalStepCount
+        self.predictionType = predictionType
+        
+        self.betas = betaSchedule.betas(betaStart: betaStart, betaEnd: betaEnd, trainStepCount: trainStepCount)
+        self.alphas = betas.map({ 1.0 - $0 })
+        var alphasCumProd = self.alphas
+        for i in 1..<alphasCumProd.count {
+            alphasCumProd[i] *= alphasCumProd[i -  1]
+        }
+        self.alphasCumProd = alphasCumProd
+        
+        let stepRatio = Double(trainStepCount / originalStepCount)
+        var lcmOriginTimesteps = (1...originalStepCount).map {
+            (Double($0) * stepRatio).rounded() - 1
+        }
+        if let strength {
+            let tEnc = Int(Float(lcmOriginTimesteps.count) * strength)
+            lcmOriginTimesteps = Array(lcmOriginTimesteps[0..<tEnc])
+        }
+        let skippingStep = Int(lcmOriginTimesteps.count / stepCount)
+        let timeSteps: [Double] = stride(from: lcmOriginTimesteps.count-1, to: 0, by: -skippingStep)
+            .map { lcmOriginTimesteps[$0] }
+        self.timeSteps = Array(timeSteps[0..<stepCount])
+    }
+    
+    func getScalingsForBoundaryConditionDiscrete(timeStep t: Double) -> (Double, Double) {
+        let sigmaData = 0.5 // Default: 0.5
+        let powSigmaData = pow(sigmaData, 2)
+        
+        // By dividing 0.1: This is almost a delta function at t=0.
+        let cSkip = powSigmaData / (pow((t / 0.1), 2) + powSigmaData)
+        let cOut = (t / 0.1) / pow((pow((t / 0.1), 2) + powSigmaData), 0.5)
+        return (cSkip, cOut)
+    }
+    
+    public func step(
+        output: MLShapedArray<Float32>,
+        timeStep t: Double,
+        sample: MLShapedArray<Float32>,
+        generator: RandomGenerator
+    ) -> MLShapedArray<Float32> {
+        
+        let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
+        
+        //  1. get previous step value
+        let timeStep = Int(t)
+        let prevTimestep = Int(stepIndex == timeSteps.count - 1 ? 0 : timeSteps[stepIndex + 1])
+        
+        // 2. compute alphas, betas
+        let alphaProdt = alphasCumProd[timeStep]
+        let alphaProdtPrev = alphasCumProd[max(0, prevTimestep)]
+        let betaProdt = 1 - alphaProdt
+        let betaProdtPrev = 1 - alphaProdtPrev
+        
+        let sqrtAlphaProdt = sqrt(alphaProdt)
+        let sqrtBetaProdt = sqrt(betaProdt)
+        
+        // 3. Get scalings for boundary conditions
+        let (cSkip, cOut) = getScalingsForBoundaryConditionDiscrete(timeStep: t)
+        
+        // 4. Compute the predicted original sample x_0 based on the model parameterization
+        let predOriginalSample: MLShapedArray<Float32>
+        switch predictionType {
+        case .epsilon:
+            let scalarCount = output.scalarCount
+            predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
+                sample.withUnsafeShapedBufferPointer { sample, _, _ in
+                    output.withUnsafeShapedBufferPointer { output, _, _ in
+                        for i in 0..<scalarCount {
+                            scalars.initializeElement(at: i, to: (sample[i] - sqrtBetaProdt * output[i]) / sqrtAlphaProdt)
+                        }
+                    }
+                }
+            }
+        case .vPrediction:
+            predOriginalSample = [sample, output]
+                .weightedSum([Double(sqrtAlphaProdt), Double(sqrtBetaProdt)])
+        }
+        
+        // 6. Denoise model output using boundary conditions
+        let denoised = [predOriginalSample, sample]
+            .weightedSum([cOut, cSkip])
+        
+        modelOutputs.removeAll(keepingCapacity: true)
+        modelOutputs.append(denoised)
+        
+        // 7. Sample and inject noise z ~ N(0, I) for MultiStep Inference
+        // Noise is not used for one-step sampling.
+        let prevSample: MLShapedArray<Float32>
+        if timeSteps.count > 1 {
+            let noise = MLShapedArray<Float32>(converting: generator.nextArray(shape: output.shape))
+            let sqrtAlphaProdtPrev = sqrt(alphaProdtPrev)
+            let sqrtBetaProdtPrev = sqrt(betaProdtPrev)
+            prevSample = [denoised, noise]
+                .weightedSum([Double(sqrtAlphaProdtPrev), Double(sqrtBetaProdtPrev)])
+        } else {
+            prevSample = denoised
+        }
+        
+        return prevSample
+    }
+}
