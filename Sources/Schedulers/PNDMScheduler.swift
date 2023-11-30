@@ -83,7 +83,7 @@ public final class PNDMScheduler: Scheduler {
             timeSteps = (0..<stepCount).map { Double($0 * stepRatio).rounded() }.reversed()
         case .trailing:
             let stepRatio = Double(trainStepCount) / Double(stepCount)
-            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
+            timeSteps = stride(from: Double(trainStepCount), to: 1, by: -stepRatio).map { round($0) - 1 }
         }
         if timeSteps.count > 1 {
             // Repeat second timestep

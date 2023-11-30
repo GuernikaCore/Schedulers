@@ -79,7 +79,7 @@ public final class KDPM2DiscreteScheduler: Scheduler {
             timeSteps = (0..<stepCount).map { Double($0 * stepRatio) }.reversed()
         case .trailing:
             let stepRatio = Double(trainStepCount) / Double(stepCount)
-            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
+            timeSteps = stride(from: Double(trainStepCount), to: 1, by: -stepRatio).map { round($0) - 1 }
         }
         
         var sigmas: [Double] = alphasCumProd.map { Double(pow((1 - $0) / $0, 0.5)) }

@@ -93,6 +93,8 @@ public final class DPMSolverMultistepScheduler: Scheduler {
             timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
         }
         
+        var alpha_t: [Float]
+        var sigma_t: [Float]
         if useKarrasSigmas {
             let scaled = vDSP.multiply(
                 subtraction: ([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd),
@@ -109,28 +111,41 @@ public final class DPMSolverMultistepScheduler: Scheduler {
             var karrasSigmas = sigmas.map { Float($0) }
             karrasSigmas.append(karrasSigmas.last!)
             
-            self.alpha_t = vDSP.divide(1, vForce.sqrt(vDSP.add(1, vDSP.square(karrasSigmas))))
-            self.sigma_t = vDSP.multiply(karrasSigmas, self.alpha_t)
+            alpha_t = vDSP.divide(1, vForce.sqrt(vDSP.add(1, vDSP.square(karrasSigmas))))
+            sigma_t = vDSP.multiply(karrasSigmas, alpha_t)
         } else {
-            self.alpha_t = vForce.sqrt(self.alphasCumProd)
-            self.sigma_t = vForce.sqrt(vDSP.subtract([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
+            alpha_t = vForce.sqrt(self.alphasCumProd)
+            sigma_t = vForce.sqrt(vDSP.subtract([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
+            
+            let timestepIndexes = timeSteps.map { Int($0) }
+            alpha_t = timestepIndexes.map { alpha_t[$0] }
+            sigma_t = timestepIndexes.map { sigma_t[$0] }
         }
-        self.lambda_t = zip(self.alpha_t, self.sigma_t).map { α, σ in log(α) - log(σ) }
         
         if let strength {
             let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
             let tStart = max(stepCount - initTimestep, 0)
             timeSteps = Array(timeSteps[tStart..<timeSteps.count])
+            alpha_t = Array(alpha_t[tStart..<alpha_t.count])
+            sigma_t = Array(sigma_t[tStart..<sigma_t.count])
         }
         self.timeSteps = timeSteps
+        self.alpha_t = alpha_t
+        self.sigma_t = sigma_t
+        self.lambda_t = zip(self.alpha_t, self.sigma_t).map { α, σ in log(α) - log(σ) }
+    }
+    
+    func timestepToIndex(_ timestep: Double) -> Int {
+        timeSteps.firstIndex(of: timestep) ?? 0
     }
     
     /// Convert the model output to the corresponding type the algorithm needs.
     /// This implementation is for second-order DPM-Solver++.
-    func convertModelOutput(modelOutput: MLShapedArray<Float32>, timestep: Int, sample: MLShapedArray<Float32>) -> MLShapedArray<Float32> {
+    func convertModelOutput(modelOutput: MLShapedArray<Float32>, timestep: Double, sample: MLShapedArray<Float32>) -> MLShapedArray<Float32> {
         assert(modelOutput.scalarCount == sample.scalarCount)
         let scalarCount = modelOutput.scalarCount
-        let (alpha_t, sigma_t) = (self.alpha_t[timestep], self.sigma_t[timestep])
+        let stepIndex = timestepToIndex(timestep)
+        let (alpha_t, sigma_t) = (self.alpha_t[stepIndex], self.sigma_t[stepIndex])
         // This could be optimized with a Metal kernel if we find we need to
         switch predictionType {
         case .epsilon:
@@ -163,13 +178,15 @@ public final class DPMSolverMultistepScheduler: Scheduler {
     /// var names and code structure mostly follow https://github.com/huggingface/diffusers/blob/main/src/diffusers/schedulers/scheduling_dpmsolver_multistep.py
     func firstOrderUpdate(
         modelOutput: MLShapedArray<Float32>,
-        timestep: Int,
-        prevTimestep: Int,
+        timestep: Double,
+        prevTimestep: Double,
         sample: MLShapedArray<Float32>
     ) -> MLShapedArray<Float32> {
-        let (p_lambda_t, lambda_s) = (Double(lambda_t[prevTimestep]), Double(lambda_t[timestep]))
-        let p_alpha_t = Double(alpha_t[prevTimestep])
-        let (p_sigma_t, sigma_s) = (Double(sigma_t[prevTimestep]), Double(sigma_t[timestep]))
+        let prevIndex = timestepToIndex(prevTimestep)
+        let currIndex = timestepToIndex(timestep)
+        let (p_lambda_t, lambda_s) = (Double(lambda_t[prevIndex]), Double(lambda_t[currIndex]))
+        let p_alpha_t = Double(alpha_t[prevIndex])
+        let (p_sigma_t, sigma_s) = (Double(sigma_t[prevIndex]), Double(sigma_t[currIndex]))
         let h = p_lambda_t - lambda_s
         // x_t = (sigma_t / sigma_s) * sample - (alpha_t * (torch.exp(-h) - 1.0)) * model_output
         let x_t = [sample, modelOutput].weightedSum(
@@ -183,14 +200,18 @@ public final class DPMSolverMultistepScheduler: Scheduler {
     func secondOrderUpdate(
         modelOutputs: [MLShapedArray<Float32>],
         timesteps: [Double],
-        prevTimestep t: Int,
+        prevTimestep t: Double,
         sample: MLShapedArray<Float32>
     ) -> MLShapedArray<Float32> {
-        let (s0, s1) = (Int(timesteps[back: 1]), Int(timesteps[back: 2]))
+        let (s0, s1) = (timesteps[back: 1], timesteps[back: 2])
         let (m0, m1) = (modelOutputs[back: 1], modelOutputs[back: 2])
-        let (p_lambda_t, lambda_s0, lambda_s1) = (Double(lambda_t[t]), Double(lambda_t[s0]), Double(lambda_t[s1]))
-        let p_alpha_t = Double(alpha_t[t])
-        let (p_sigma_t, sigma_s0) = (Double(sigma_t[t]), Double(sigma_t[s0]))
+        let (p_lambda_t, lambda_s0, lambda_s1) = (
+            Double(lambda_t[timestepToIndex(t)]),
+            Double(lambda_t[timestepToIndex(s0)]),
+            Double(lambda_t[timestepToIndex(s1)])
+        )
+        let p_alpha_t = Double(alpha_t[timestepToIndex(t)])
+        let (p_sigma_t, sigma_s0) = (Double(sigma_t[timestepToIndex(t)]), Double(sigma_t[timestepToIndex(s0)]))
         let (h, h_0) = (p_lambda_t - lambda_s0, lambda_s0 - lambda_s1)
         let r0 = h_0 / h
         let D0 = m0
@@ -216,9 +237,9 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         sample: MLShapedArray<Float32>,
         generator: RandomGenerator
     ) -> MLShapedArray<Float32> {
-        let timeStep = Int(t)
+        let timeStep = t
         let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
-        let prevTimestep = Int(stepIndex == timeSteps.count - 1 ? 0 : timeSteps[stepIndex + 1])
+        let prevTimestep = stepIndex == timeSteps.count - 1 ? 0 : timeSteps[stepIndex + 1]
 
         let lowerOrderFinal = useLowerOrderFinal && stepIndex == timeSteps.count - 1 && timeSteps.count < 15
         let lowerOrderSecond = useLowerOrderFinal && stepIndex == timeSteps.count - 2 && timeSteps.count < 15
@@ -244,5 +265,20 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         }
         
         return prevSample
+    }
+    
+    public func addNoise(
+        originalSample: MLShapedArray<Float32>,
+        noise: [MLShapedArray<Float32>],
+        timeStep t: Double?
+    ) -> [MLShapedArray<Float32>] {
+        let stepIndex = t.flatMap { timeSteps.firstIndex(of: $0) } ?? 0
+        let (alpha_t, sigma_t) = (self.alpha_t[stepIndex], self.sigma_t[stepIndex])
+        
+        let noisySamples = noise.map {
+            [originalSample, $0].weightedSum([Double(alpha_t), Double(sigma_t)])
+        }
+        
+        return noisySamples
     }
 }
