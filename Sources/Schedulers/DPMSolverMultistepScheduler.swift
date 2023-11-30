@@ -110,6 +110,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
             
             var karrasSigmas = sigmas.map { Float($0) }
             karrasSigmas.append(karrasSigmas.last!)
+            karrasSigmas.reverse()
             
             alpha_t = vDSP.divide(1, vForce.sqrt(vDSP.add(1, vDSP.square(karrasSigmas))))
             sigma_t = vDSP.multiply(karrasSigmas, alpha_t)
@@ -239,7 +240,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
     ) -> MLShapedArray<Float32> {
         let timeStep = t
         let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
-        let prevTimestep = stepIndex == timeSteps.count - 1 ? 0 : timeSteps[stepIndex + 1]
+        let prevTimestep = stepIndex == timeSteps.count - 1 ? timeSteps.last! : timeSteps[stepIndex + 1]
 
         let lowerOrderFinal = useLowerOrderFinal && stepIndex == timeSteps.count - 1 && timeSteps.count < 15
         let lowerOrderSecond = useLowerOrderFinal && stepIndex == timeSteps.count - 2 && timeSteps.count < 15
