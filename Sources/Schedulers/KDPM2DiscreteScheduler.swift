@@ -29,6 +29,7 @@ public final class KDPM2DiscreteScheduler: Scheduler {
     public let sigmasInterpol: [Double]
     public let predictionType: PredictionType
     public let initNoiseSigma: Float
+    public var order: Int { 2 }
     
     public private(set) var modelOutputs: [MLShapedArray<Float32>] = []
     
@@ -51,11 +52,14 @@ public final class KDPM2DiscreteScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
-        predictionType: PredictionType = .epsilon
+        predictionType: PredictionType = .epsilon,
+        timestepSpacing: TimestepSpacing? = nil,
+        useKarrasSigmas: Bool = false
     ) {
         self.trainStepCount = trainStepCount
         self.inferenceStepCount = stepCount
         self.predictionType = predictionType
+        let timestepSpacing = timestepSpacing ?? .linspace
         
         self.betas = betaSchedule.betas(betaStart: betaStart, betaEnd: betaEnd, trainStepCount: trainStepCount)
         self.alphas = betas.map({ 1.0 - $0 })
@@ -65,10 +69,27 @@ public final class KDPM2DiscreteScheduler: Scheduler {
         }
         self.alphasCumProd = alphasCumProd
         
-        var timeSteps = linspace(0, Double(trainStepCount - 1), inferenceStepCount)
+        var timeSteps: [Double]
+        switch timestepSpacing {
+        case .linspace:
+            timeSteps = linspace(0, Double(trainStepCount - 1), stepCount)
+                .reversed()
+        case .leading:
+            let stepRatio = trainStepCount / stepCount
+            timeSteps = (0..<stepCount).map { Double($0 * stepRatio) }.reversed()
+        case .trailing:
+            let stepRatio = Double(trainStepCount) / Double(stepCount)
+            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
+        }
+        
         var sigmas: [Double] = alphasCumProd.map { Double(pow((1 - $0) / $0, 0.5)) }
         let logSigmas = sigmas.map { log($0) }
-        sigmas = vDSP.linearInterpolate(elementsOf: sigmas, using: timeSteps).reversed() + [0]
+        sigmas = vDSP.linearInterpolate(elementsOf: sigmas, using: timeSteps)
+        if useKarrasSigmas {
+            sigmas = KDPM2DiscreteScheduler.convertToKarras(sigmas: sigmas, stepCount: stepCount)
+            timeSteps = KDPM2DiscreteScheduler.convertToTimesteps(sigmas: sigmas, logSigmas: logSigmas)
+        }
+        sigmas = sigmas + [0]
         
         // interpolate sigmas
         var sigmasInterpol = vDSP.linearInterpolate(
@@ -77,45 +98,15 @@ public final class KDPM2DiscreteScheduler: Scheduler {
             using: 0.5
         ).map { exp($0) }.map { $0.isNaN ? 0 : $0 }
         
-        func sigmaToT(sigmas: [Double], logSigmas: [Double]) -> [Double] {
-            // get log sigma
-            let logSigma = sigmas.map { log($0) }
-            
-            // get ditribution
-            let dists = logSigmas.map { lS in
-                logSigma.map { $0 - lS }
-            }
-            
-            // get sigmas range
-            let lowIdx = dists.map { a in
-                a.map { $0 >= 0 }
-            }.reduce(into: [Int](repeating: 0, count: dists[0].count)) { result, a in
-                for index in 0..<a.count {
-                    if a[index] {
-                        result[index] += 1
-                    }
-                }
-            }.map { max(0, min($0 - 1, logSigmas.count - 2)) }
-            let highIdx = lowIdx.map { $0 + 1 }
-            
-            let low = lowIdx.map { logSigmas[$0] }
-            let high = highIdx.map { logSigmas[$0] }
-            
-            // interpolate sigmas
-            let w: [Double] = (0..<logSigma.count).map { index in
-                max(0, min(1, (low[index] - logSigma[index]) / (low[index] - high[index])))
-            }
-            
-            // transform interpolation to time range
-            let t: [Double] = (0..<w.count).map { index in
-                (1 - w[index]) * Double(lowIdx[index]) + w[index] * Double(highIdx[index])
-            }
-            return t
+        let timestepsInterpol = KDPM2DiscreteScheduler.convertToTimesteps(sigmas: sigmasInterpol, logSigmas: logSigmas)
+        print(timestepsInterpol)
+        
+        switch timestepSpacing {
+        case .linspace, .leading:
+            self.initNoiseSigma = Float(sigmas.max() ?? 1)
+        case .trailing:
+            self.initNoiseSigma = pow(pow(Float(sigmas.max() ?? 1), 2) + 1, 0.5)
         }
-        
-        let timestepsInterpol = sigmaToT(sigmas: sigmasInterpol, logSigmas: logSigmas)
-        
-        self.initNoiseSigma = Float(sigmas.max() ?? 1)
         
         sigmas = [sigmas[0]] +
             sigmas[1..<sigmas.count].flatMap { [$0, $0] } +
@@ -124,14 +115,13 @@ public final class KDPM2DiscreteScheduler: Scheduler {
             sigmasInterpol[1..<sigmasInterpol.count].flatMap { [$0, $0] } +
             [sigmasInterpol.last!]
         
-        timeSteps.reverse()
         timeSteps = [timeSteps[0]] + zip(timestepsInterpol[1..<timestepsInterpol.count - 1], timeSteps[1..<timeSteps.count]).flatMap { [$0, $1] }
         if let strength {
-            let tEnc = Int(Float(timeSteps.count) * strength)
-            let startEnc = timeSteps.count - tEnc
-            timeSteps = Array(timeSteps[startEnc..<timeSteps.count])
-            sigmas = Array(sigmas[startEnc..<sigmas.count])
-            sigmasInterpol = Array(sigmasInterpol[startEnc..<sigmasInterpol.count])
+            let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
+            let tStart = max(stepCount - initTimestep, 0) * 2 // * order
+            timeSteps = Array(timeSteps[tStart..<timeSteps.count])
+            sigmas = Array(sigmas[tStart..<sigmas.count])
+            sigmasInterpol = Array(sigmasInterpol[tStart..<sigmasInterpol.count])
         }
         self.timeSteps = timeSteps.map { Double($0) }
         self.sigmas = sigmas

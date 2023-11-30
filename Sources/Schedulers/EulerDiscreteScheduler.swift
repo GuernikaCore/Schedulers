@@ -46,11 +46,14 @@ public final class EulerDiscreteScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
-        predictionType: PredictionType = .epsilon
+        predictionType: PredictionType = .epsilon,
+        timestepSpacing: TimestepSpacing? = nil,
+        useKarrasSigmas: Bool = false
     ) {
         self.trainStepCount = trainStepCount
         self.inferenceStepCount = stepCount
         self.predictionType = predictionType
+        let timestepSpacing = timestepSpacing ?? .linspace
 
         self.betas = betaSchedule.betas(betaStart: betaStart, betaEnd: betaEnd, trainStepCount: trainStepCount)
         self.alphas = betas.map({ 1.0 - $0 })
@@ -60,17 +63,44 @@ public final class EulerDiscreteScheduler: Scheduler {
         }
         self.alphasCumProd = alphasCumProd
         
-        var timeSteps = linspace(0, Double(trainStepCount - 1), inferenceStepCount)
-        var sigmas: [Double] = alphasCumProd.map { Double(pow((1 - $0) / $0, 0.5)) }
-        sigmas = vDSP.linearInterpolate(elementsOf: sigmas, using: timeSteps).reversed() + [0]
-        self.initNoiseSigma = Float(sigmas.max() ?? 1)
-        if let strength {
-            let tEnc = Int(Float(timeSteps.count) * strength)
-            let startSigma = timeSteps.count - tEnc
-            timeSteps = Array(timeSteps[0..<tEnc])
-            sigmas = Array(sigmas[startSigma..<sigmas.count])
+        var timeSteps: [Double]
+        switch timestepSpacing {
+        case .linspace:
+            timeSteps = linspace(0, Double(trainStepCount - 1), stepCount)
+                .reversed()
+        case .leading:
+            let stepRatio = trainStepCount / stepCount
+            timeSteps = (0..<stepCount).map { Double($0 * stepRatio) }.reversed()
+        case .trailing:
+            let stepRatio = Double(trainStepCount) / Double(stepCount)
+            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
         }
-        timeSteps.reverse()
+        
+        var sigmas: [Double] = alphasCumProd.map { Double(pow((1 - $0) / $0, 0.5)) }
+        if useKarrasSigmas {
+            let logSigmas = sigmas.map { log($0) }
+            sigmas = vDSP.linearInterpolate(elementsOf: sigmas, using: timeSteps)
+            
+            sigmas = EulerDiscreteScheduler.convertToKarras(sigmas: sigmas, stepCount: stepCount)
+            timeSteps = EulerDiscreteScheduler.convertToTimesteps(sigmas: sigmas, logSigmas: logSigmas)
+            sigmas = sigmas + [0]
+        } else {
+            sigmas = vDSP.linearInterpolate(elementsOf: sigmas, using: timeSteps) + [0]
+        }
+        
+        switch timestepSpacing {
+        case .linspace, .leading:
+            self.initNoiseSigma = Float(sigmas.max() ?? 1)
+        case .trailing:
+            self.initNoiseSigma = pow(pow(Float(sigmas.max() ?? 1), 2) + 1, 0.5)
+        }
+        
+        if let strength {
+            let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
+            let tStart = max(stepCount - initTimestep, 0)
+            timeSteps = Array(timeSteps[tStart..<timeSteps.count])
+            sigmas = Array(sigmas[tStart..<sigmas.count])
+        }
         self.timeSteps = timeSteps
         self.sigmas = sigmas
     }

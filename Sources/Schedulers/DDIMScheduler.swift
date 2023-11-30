@@ -42,11 +42,13 @@ public final class DDIMScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
-        predictionType: PredictionType = .epsilon
+        predictionType: PredictionType = .epsilon,
+        timestepSpacing: TimestepSpacing? = nil
     ) {
         self.trainStepCount = trainStepCount
         self.inferenceStepCount = stepCount
         self.predictionType = predictionType
+        let timestepSpacing = timestepSpacing ?? .leading
 
         self.betas = betaSchedule.betas(betaStart: betaStart, betaEnd: betaEnd, trainStepCount: trainStepCount)
         self.alphas = betas.map({ 1.0 - $0 })
@@ -55,23 +57,27 @@ public final class DDIMScheduler: Scheduler {
             alphasCumProd[i] *= alphasCumProd[i -  1]
         }
         self.alphasCumProd = alphasCumProd
-        let stepsOffset = 1 // For stable diffusion
-        let stepRatio = Float(trainStepCount / stepCount )
-        let forwardSteps = (0..<stepCount).map {
-            Int((Float($0) * stepRatio).rounded()) + stepsOffset
-        }
-
-        var timeSteps: [Int] = []
-        timeSteps.append(contentsOf: forwardSteps.dropLast(1))
-        timeSteps.append(timeSteps.last!)
-        timeSteps.append(forwardSteps.last!)
-        if let strength {
-            let tEnc = Int(Float(timeSteps.count) * strength)
-            timeSteps = Array(timeSteps[0..<tEnc])
-        }
-        timeSteps.reverse()
         
-        self.timeSteps = timeSteps.map { Double($0) }
+        var timeSteps: [Double]
+        switch timestepSpacing {
+        case .linspace:
+            timeSteps = linspace(0, Double(trainStepCount - 1), stepCount)
+                .map { $0.rounded() }
+                .reversed()
+        case .leading:
+            let stepRatio = trainStepCount / stepCount
+            timeSteps = (0..<stepCount).map { Double($0 * stepRatio).rounded() }.reversed()
+        case .trailing:
+            let stepRatio = Double(trainStepCount) / Double(stepCount)
+            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
+        }
+        
+        if let strength {
+            let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
+            let tStart = max(stepCount - initTimestep, 0)
+            timeSteps = Array(timeSteps[tStart..<timeSteps.count])
+        }
+        self.timeSteps = timeSteps
     }
 
     public func step(

@@ -17,6 +17,7 @@ import Foundation
 ///   - count: The number of floats to return between [*start*, *end*]
 /// - Returns: Float array with *count* elements evenly spaced between at *start* and *end*
 func linspace<Number: FloatingPoint>(_ start: Number, _ end: Number, _ count: Int) -> [Number] {
+    guard count > 1 else { return [start] }
     let scale = (end - start) / Number(count - 1)
     return (0..<count).map { Number($0) * scale + start }
 }
@@ -50,5 +51,11 @@ extension Array where Element == MLShapedArray<Float32> {
                 }
             }
         }
+    }
+}
+
+extension FloatingPoint {
+    func clipped(to range: ClosedRange<Self>) -> Self {
+        return min(max(self, range.lowerBound), range.upperBound)
     }
 }

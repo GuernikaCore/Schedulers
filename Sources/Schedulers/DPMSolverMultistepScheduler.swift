@@ -59,11 +59,14 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
-        predictionType: PredictionType = .epsilon
+        predictionType: PredictionType = .epsilon,
+        timestepSpacing: TimestepSpacing? = nil,
+        useKarrasSigmas: Bool = false
     ) {
         self.trainStepCount = trainStepCount
         self.inferenceStepCount = stepCount
         self.predictionType = predictionType
+        let timestepSpacing = timestepSpacing ?? .linspace
         
         self.betas = betaSchedule.betas(betaStart: betaStart, betaEnd: betaEnd, trainStepCount: trainStepCount)
         self.alphas = betas.map({ 1.0 - $0 })
@@ -72,19 +75,54 @@ public final class DPMSolverMultistepScheduler: Scheduler {
             alphasCumProd[i] *= alphasCumProd[i -  1]
         }
         self.alphasCumProd = alphasCumProd
-
-        // Currently we only support VP-type noise shedule
-        self.alpha_t = vForce.sqrt(self.alphasCumProd)
-        self.sigma_t = vForce.sqrt(vDSP.subtract([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
-        self.lambda_t = zip(self.alpha_t, self.sigma_t).map { α, σ in log(α) - log(σ) }
-
-        var timeSteps: [Int] = linspace(0, Float(trainStepCount - 1), stepCount+1).dropFirst().map { Int(round($0)) }
-        if let strength {
-            let tEnc = Int(Float(timeSteps.count) * strength)
-            timeSteps = Array(timeSteps[0..<tEnc])
+        
+        var timeSteps: [Double]
+        switch timestepSpacing {
+        case .linspace:
+            timeSteps = linspace(0, Double(trainStepCount - 1), stepCount + 1)
+                .reversed()
+                .dropLast()
+                .map { $0.rounded() }
+        case .leading:
+            let stepRatio = trainStepCount / (stepCount + 1)
+            timeSteps = (0..<stepCount + 1).map { Double($0 * stepRatio).rounded() }
+                .reversed()
+                .dropLast()
+        case .trailing:
+            let stepRatio = Double(trainStepCount) / Double(stepCount)
+            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
         }
-        timeSteps.reverse()
-        self.timeSteps = timeSteps.map { Double($0) }
+        
+        if useKarrasSigmas {
+            let scaled = vDSP.multiply(
+                subtraction: ([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd),
+                subtraction: (vDSP.divide(1, self.alphasCumProd), [Float](repeating: 0, count: self.alphasCumProd.count))
+            )
+            var sigmas = vForce.sqrt(scaled).map { Double($0) }
+            let logSigmas = sigmas.map { log($0) }
+            
+            sigmas = DPMSolverMultistepScheduler.convertToKarras(sigmas: sigmas, stepCount: stepCount)
+            timeSteps = DPMSolverMultistepScheduler.convertToTimesteps(sigmas: sigmas, logSigmas: logSigmas)
+                .reversed()
+                .map { $0.rounded() }
+            
+            var karrasSigmas = sigmas.map { Float($0) }
+            karrasSigmas.append(karrasSigmas.last!)
+            
+            self.alpha_t = vDSP.divide(1, vForce.sqrt(vDSP.add(1, vDSP.square(karrasSigmas))))
+            self.sigma_t = vDSP.multiply(karrasSigmas, self.alpha_t)
+        } else {
+            self.alpha_t = vForce.sqrt(self.alphasCumProd)
+            self.sigma_t = vForce.sqrt(vDSP.subtract([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
+        }
+        self.lambda_t = zip(self.alpha_t, self.sigma_t).map { α, σ in log(α) - log(σ) }
+        
+        if let strength {
+            let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
+            let tStart = max(stepCount - initTimestep, 0)
+            timeSteps = Array(timeSteps[tStart..<timeSteps.count])
+        }
+        self.timeSteps = timeSteps
     }
     
     /// Convert the model output to the corresponding type the algorithm needs.
