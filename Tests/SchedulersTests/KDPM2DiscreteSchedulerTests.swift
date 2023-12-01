@@ -10,12 +10,14 @@ import XCTest
 
 final class KDPM2DiscreteSchedulerTests: XCTestCase {
     func test1StepsLinspace() throws {
-        let scheduler = KDPM2DiscreteScheduler(stepCount: 1, timestepSpacing: .linspace)
+        var scheduler = KDPM2DiscreteScheduler(stepCount: 1)
+        XCTAssertEqual(scheduler.timeSteps, [0])
+        scheduler = KDPM2DiscreteScheduler(strength: 0.9, stepCount: 1)
         XCTAssertEqual(scheduler.timeSteps, [0])
     }
     
     func test2StepsLinspace() throws {
-        let scheduler = KDPM2DiscreteScheduler(stepCount: 2, timestepSpacing: .linspace)
+        let scheduler = KDPM2DiscreteScheduler(stepCount: 2)
         zip(scheduler.timeSteps, [999.00000000, 233.20971680,   0]).forEach { actual, expected in
             XCTAssertEqual(actual, expected, accuracy: 0.02)
         }

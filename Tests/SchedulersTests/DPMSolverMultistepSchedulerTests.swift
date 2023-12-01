@@ -10,12 +10,14 @@ import XCTest
 
 final class DPMSolverMultistepSchedulerTests: XCTestCase {
     func test1StepsLinspace() throws {
-        let scheduler = DPMSolverMultistepScheduler(stepCount: 1, timestepSpacing: .linspace)
+        var scheduler = DPMSolverMultistepScheduler(stepCount: 1)
+        XCTAssertEqual(scheduler.timeSteps, [999])
+        scheduler = DPMSolverMultistepScheduler(strength: 0.9, stepCount: 1)
         XCTAssertEqual(scheduler.timeSteps, [999])
     }
     
     func test2StepsLinspace() throws {
-        let scheduler = DPMSolverMultistepScheduler(stepCount: 2, timestepSpacing: .linspace)
+        let scheduler = DPMSolverMultistepScheduler(stepCount: 2)
         XCTAssertEqual(scheduler.timeSteps, [999,   500])
     }
     

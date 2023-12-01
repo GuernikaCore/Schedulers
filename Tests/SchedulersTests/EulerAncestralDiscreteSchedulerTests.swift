@@ -9,6 +9,18 @@ import XCTest
 @testable import Schedulers
 
 final class EulerAncestralDiscreteSchedulerTests: XCTestCase {
+    func test1StepsLinspace() throws {
+        var scheduler = EulerAncestralDiscreteScheduler(stepCount: 1)
+        XCTAssertEqual(scheduler.timeSteps, [0])
+        scheduler = EulerAncestralDiscreteScheduler(strength: 0.9, stepCount: 1)
+        XCTAssertEqual(scheduler.timeSteps, [0])
+    }
+    
+    func test2StepsLinspace() throws {
+        let scheduler = EulerAncestralDiscreteScheduler(stepCount: 2)
+        XCTAssertEqual(scheduler.timeSteps, [999,   0])
+    }
+    
     func test33StepsLinspace() throws {
         let scheduler = EulerAncestralDiscreteScheduler(stepCount: 33, timestepSpacing: .linspace)
         print(scheduler.sigmas)

@@ -10,13 +10,15 @@ import XCTest
 
 final class PNDMSchedulerTests: XCTestCase {
     func test1StepsLinspace() throws {
-        let scheduler = PNDMScheduler(stepCount: 1, timestepSpacing: .linspace)
+        var scheduler = PNDMScheduler(stepCount: 1)
+        XCTAssertEqual(scheduler.timeSteps, [0])
+        scheduler = PNDMScheduler(strength: 0.9, stepCount: 1)
         XCTAssertEqual(scheduler.timeSteps, [0])
     }
     
     func test2StepsLinspace() throws {
-        let scheduler = PNDMScheduler(stepCount: 2, timestepSpacing: .linspace)
-        XCTAssertEqual(scheduler.timeSteps, [999,   0,   0])
+        let scheduler = PNDMScheduler(stepCount: 2)
+        XCTAssertEqual(scheduler.timeSteps, [500,   0,   0])
     }
     
     func test33StepsLinspace() throws {
