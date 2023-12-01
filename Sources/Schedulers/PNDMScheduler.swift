@@ -92,7 +92,7 @@ public final class PNDMScheduler: Scheduler {
         
         if let strength {
             let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
-            let tStart = max(stepCount - initTimestep, 0)
+            let tStart = min(timeSteps.count - 1, max(stepCount - initTimestep, 0))
             timeSteps = Array(timeSteps[tStart..<timeSteps.count])
         }
         self.timeSteps = timeSteps

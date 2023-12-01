@@ -118,7 +118,7 @@ public final class KDPM2DiscreteScheduler: Scheduler {
         timeSteps = [timeSteps[0]] + zip(timestepsInterpol[1..<timestepsInterpol.count - 1], timeSteps[1..<timeSteps.count]).flatMap { [$0, $1] }
         if let strength {
             let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
-            let tStart = max(stepCount - initTimestep, 0) * 2 // * order
+            let tStart = min(timeSteps.count - 1, max(stepCount - initTimestep, 0) * 2) // * order
             timeSteps = Array(timeSteps[tStart..<timeSteps.count])
             sigmas = Array(sigmas[tStart..<sigmas.count])
             sigmasInterpol = Array(sigmasInterpol[tStart..<sigmasInterpol.count])

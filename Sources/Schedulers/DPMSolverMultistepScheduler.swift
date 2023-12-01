@@ -125,7 +125,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         
         if let strength {
             let initTimestep = min(Int(Float(stepCount) * strength), stepCount)
-            let tStart = max(stepCount - initTimestep, 0)
+            let tStart = min(timeSteps.count - 1, max(stepCount - initTimestep, 0))
             timeSteps = Array(timeSteps[tStart..<timeSteps.count])
             alpha_t = Array(alpha_t[tStart..<alpha_t.count])
             sigma_t = Array(sigma_t[tStart..<sigma_t.count])
@@ -137,7 +137,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
     }
     
     func timestepToIndex(_ timestep: Double) -> Int {
-        timeSteps.firstIndex(of: timestep) ?? 0
+        timeSteps.firstIndex(of: timestep) ?? timeSteps.count - 1
     }
     
     /// Convert the model output to the corresponding type the algorithm needs.
@@ -239,8 +239,8 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         generator: RandomGenerator
     ) -> MLShapedArray<Float32> {
         let timeStep = t
-        let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
-        let prevTimestep = stepIndex == timeSteps.count - 1 ? timeSteps.last! : timeSteps[stepIndex + 1]
+        let stepIndex = timestepToIndex(timeStep)
+        let prevTimestep = stepIndex == timeSteps.count - 1 ? 0 : timeSteps[stepIndex + 1]
 
         let lowerOrderFinal = useLowerOrderFinal && stepIndex == timeSteps.count - 1 && timeSteps.count < 15
         let lowerOrderSecond = useLowerOrderFinal && stepIndex == timeSteps.count - 2 && timeSteps.count < 15
