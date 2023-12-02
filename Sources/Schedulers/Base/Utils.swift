@@ -15,11 +15,17 @@ import Foundation
 ///   - start: Start of the interval
 ///   - end: End of the interval
 ///   - count: The number of floats to return between [*start*, *end*]
+///   - endpoint: If true, `end` is the last sample. Otherwise, it is not included. Default is true
 /// - Returns: Float array with *count* elements evenly spaced between at *start* and *end*
-func linspace<Number: FloatingPoint>(_ start: Number, _ end: Number, _ count: Int) -> [Number] {
+func linspace<Number: FloatingPoint>(_ start: Number, _ end: Number, _ count: Int, endpoint: Bool = true) -> [Number] {
     guard count > 1 else { return [start] }
-    let scale = (end - start) / Number(count - 1)
-    return (0..<count).map { Number($0) * scale + start }
+    let div = endpoint ? Number(count - 1) : Number(count)
+    let scale = (end - start) / div
+    var y = (0..<count).map { Number($0) * scale + start }
+    if endpoint {
+        y[count - 1] = end
+    }
+    return y
 }
 
 extension Collection {
