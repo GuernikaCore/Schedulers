@@ -90,7 +90,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
                 .dropLast()
         case .trailing:
             let stepRatio = Double(trainStepCount) / Double(stepCount)
-            timeSteps = stride(from: Double(trainStepCount), to: 0, by: -stepRatio).map { round($0) - 1 }
+            timeSteps = stride(from: Double(trainStepCount), to: 1, by: -stepRatio).map { round($0) - 1 }
         }
         
         var alpha_t: [Float]
@@ -104,13 +104,12 @@ public final class DPMSolverMultistepScheduler: Scheduler {
             let logSigmas = sigmas.map { log($0) }
             
             sigmas = DPMSolverMultistepScheduler.convertToKarras(sigmas: sigmas, stepCount: stepCount)
-            timeSteps = DPMSolverMultistepScheduler.convertToTimesteps(sigmas: sigmas, logSigmas: logSigmas)
                 .reversed()
+            timeSteps = DPMSolverMultistepScheduler.convertToTimesteps(sigmas: sigmas, logSigmas: logSigmas)
                 .map { $0.rounded() }
             
             var karrasSigmas = sigmas.map { Float($0) }
             karrasSigmas.append(karrasSigmas.last!)
-            karrasSigmas.reverse()
             
             alpha_t = vDSP.divide(1, vForce.sqrt(vDSP.add(1, vDSP.square(karrasSigmas))))
             sigma_t = vDSP.multiply(karrasSigmas, alpha_t)
@@ -118,7 +117,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
             alpha_t = vForce.sqrt(self.alphasCumProd)
             sigma_t = vForce.sqrt(vDSP.subtract([Float](repeating: 1, count: self.alphasCumProd.count), self.alphasCumProd))
             
-            let timestepIndexes = timeSteps.map { Int($0) }
+            let timestepIndexes = timeSteps.map { Int($0) } + [0]
             alpha_t = timestepIndexes.map { alpha_t[$0] }
             sigma_t = timestepIndexes.map { sigma_t[$0] }
         }
@@ -137,7 +136,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
     }
     
     func timestepToIndex(_ timestep: Double) -> Int {
-        timeSteps.firstIndex(of: timestep) ?? timeSteps.count - 1
+        timeSteps.firstIndex(of: timestep) ?? timeSteps.count
     }
     
     /// Convert the model output to the corresponding type the algorithm needs.
@@ -239,7 +238,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         generator: RandomGenerator
     ) -> MLShapedArray<Float32> {
         let timeStep = t
-        let stepIndex = timestepToIndex(timeStep)
+        let stepIndex = timeSteps.firstIndex(of: t) ?? timeSteps.count - 1
         let prevTimestep = stepIndex == timeSteps.count - 1 ? 0 : timeSteps[stepIndex + 1]
 
         let lowerOrderFinal = useLowerOrderFinal && stepIndex == timeSteps.count - 1 && timeSteps.count < 15
