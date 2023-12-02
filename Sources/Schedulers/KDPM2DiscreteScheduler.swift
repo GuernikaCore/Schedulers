@@ -99,7 +99,6 @@ public final class KDPM2DiscreteScheduler: Scheduler {
         ).map { exp($0) }.map { $0.isNaN ? 0 : $0 }
         
         let timestepsInterpol = KDPM2DiscreteScheduler.convertToTimesteps(sigmas: sigmasInterpol, logSigmas: logSigmas)
-        print(timestepsInterpol)
         
         switch timestepSpacing {
         case .linspace, .leading:
