@@ -61,7 +61,7 @@ public final class LCMScheduler: Scheduler {
         self.alphasCumProd = alphasCumProd
         
         let stepRatio = Double(trainStepCount / originalStepCount)
-        var lcmOriginTimesteps = (1...Int(Float(originalStepCount) * (strength ?? 1))).map {
+        var lcmOriginTimesteps = (1...max(1, Int(Float(originalStepCount) * (strength ?? 1)))).map {
             (Double($0) * stepRatio).rounded() - 1
         }
         lcmOriginTimesteps.reverse()
