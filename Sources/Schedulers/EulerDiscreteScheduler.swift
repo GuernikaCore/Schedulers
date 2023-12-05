@@ -46,8 +46,8 @@ public final class EulerDiscreteScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
-        predictionType: PredictionType = .epsilon,
         stepsOffset: Int? = nil,
+        predictionType: PredictionType = .epsilon,
         timestepSpacing: TimestepSpacing? = nil,
         useKarrasSigmas: Bool = false
     ) {

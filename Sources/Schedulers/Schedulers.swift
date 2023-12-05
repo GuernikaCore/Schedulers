@@ -52,6 +52,8 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
+        setAlphaToOne: Bool? = nil,
+        stepsOffset: Int? = nil,
         predictionType: PredictionType = .epsilon,
         timestepSpacing: TimestepSpacing? = nil
     ) -> any Scheduler {
@@ -63,6 +65,8 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            setAlphaToOne: setAlphaToOne,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing
         )
@@ -73,6 +77,8 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            setAlphaToOne: setAlphaToOne,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing
         )
@@ -83,6 +89,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing
         )
@@ -93,6 +100,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing,
             useKarrasSigmas: true
@@ -104,6 +112,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing
         )
@@ -114,6 +123,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing
         )
@@ -124,6 +134,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing,
             useKarrasSigmas: true
@@ -135,6 +146,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing
         )
@@ -145,6 +157,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            stepsOffset: stepsOffset,
             predictionType: predictionType,
             timestepSpacing: timestepSpacing,
             useKarrasSigmas: true
@@ -157,6 +170,7 @@ public enum Schedulers: String, CaseIterable, Identifiable, CustomStringConverti
             betaSchedule: betaSchedule,
             betaStart: betaStart,
             betaEnd: betaEnd,
+            setAlphaToOne: setAlphaToOne,
             predictionType: predictionType
         )
         }
