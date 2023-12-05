@@ -47,6 +47,7 @@ public final class EulerAncestralDiscreteScheduler: Scheduler {
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
         predictionType: PredictionType = .epsilon,
+        stepsOffset: Int? = nil,
         timestepSpacing: TimestepSpacing? = nil
     ) {
         self.trainStepCount = trainStepCount
@@ -69,7 +70,7 @@ public final class EulerAncestralDiscreteScheduler: Scheduler {
                 .reversed()
         case .leading:
             let stepRatio = trainStepCount / stepCount
-            timeSteps = (0..<stepCount).map { Double($0 * stepRatio) }.reversed()
+            timeSteps = (0..<stepCount).map { Double($0 * stepRatio) + Double(stepsOffset ?? 0) }.reversed()
         case .trailing:
             let stepRatio = Double(trainStepCount) / Double(stepCount)
             timeSteps = stride(from: Double(trainStepCount), to: 1, by: -stepRatio).map { round($0) - 1 }

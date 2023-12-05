@@ -60,6 +60,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
         predictionType: PredictionType = .epsilon,
+        stepsOffset: Int? = nil,
         timestepSpacing: TimestepSpacing? = nil,
         useKarrasSigmas: Bool = false
     ) {
@@ -85,7 +86,7 @@ public final class DPMSolverMultistepScheduler: Scheduler {
                 .map { $0.rounded() }
         case .leading:
             let stepRatio = trainStepCount / (stepCount + 1)
-            timeSteps = (0..<stepCount + 1).map { Double($0 * stepRatio).rounded() }
+            timeSteps = (0..<stepCount + 1).map { Double($0 * stepRatio).rounded() + Double(stepsOffset ?? 0) }
                 .reversed()
                 .dropLast()
         case .trailing:
