@@ -21,6 +21,7 @@ public final class PNDMScheduler: Scheduler {
     public let betas: [Float]
     public let alphas: [Float]
     public let alphasCumProd: [Float]
+    public let finalAlphaCumProd: Float
     public let timeSteps: [Double]
     public let predictionType: PredictionType
     
@@ -51,6 +52,7 @@ public final class PNDMScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
+        setAlphaToOne: Bool? = nil,
         stepsOffset: Int? = nil,
         predictionType: PredictionType = .epsilon,
         timestepSpacing: TimestepSpacing? = nil
@@ -67,6 +69,12 @@ public final class PNDMScheduler: Scheduler {
             alphasCumProd[i] *= alphasCumProd[i -  1]
         }
         self.alphasCumProd = alphasCumProd
+        
+        if setAlphaToOne ?? false {
+            self.finalAlphaCumProd = 1
+        } else {
+            self.finalAlphaCumProd = alphasCumProd[0]
+        }
         
         // Currently we only support VP-type noise shedule
         self.alpha_t = vForce.sqrt(self.alphasCumProd)
@@ -212,7 +220,7 @@ public final class PNDMScheduler: Scheduler {
         // betaProdt        (1 - α_t)
         // betaProdtPrev    (1 - α_(t−δ))
         let alphaProdt = alphasCumProd[timeStep]
-        let alphaProdtPrev = alphasCumProd[max(0, prevStep)]
+        let alphaProdtPrev = prevStep >= 0 ? alphasCumProd[prevStep] : finalAlphaCumProd
         let betaProdt = 1 - alphaProdt
         let betaProdtPrev = 1 - alphaProdtPrev
 

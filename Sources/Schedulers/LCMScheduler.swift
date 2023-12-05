@@ -22,6 +22,7 @@ public final class LCMScheduler: Scheduler {
     public let betas: [Float]
     public let alphas: [Float]
     public let alphasCumProd: [Float]
+    public let finalAlphaCumProd: Float
     public let timeSteps: [Double]
     public let predictionType: PredictionType
     
@@ -45,6 +46,7 @@ public final class LCMScheduler: Scheduler {
         betaSchedule: BetaSchedule = .scaledLinear,
         betaStart: Float = 0.00085,
         betaEnd: Float = 0.012,
+        setAlphaToOne: Bool? = nil,
         predictionType: PredictionType = .epsilon,
         timestepSpacing: TimestepSpacing? = nil
     ) {
@@ -59,6 +61,16 @@ public final class LCMScheduler: Scheduler {
             alphasCumProd[i] *= alphasCumProd[i -  1]
         }
         self.alphasCumProd = alphasCumProd
+        
+        // At every step in ddim, we are looking into the previous alphas_cumprod
+        // For the final step, there is no previous alphas_cumprod because we are already at 0
+        // `setAlphaToOne` decides whether we set this parameter simply to one or
+        // whether we use the final alpha of the "non-previous" one.
+        if setAlphaToOne ?? true {
+            self.finalAlphaCumProd = 1
+        } else {
+            self.finalAlphaCumProd = alphasCumProd[0]
+        }
         
         let stepRatio = Double(trainStepCount / originalStepCount)
         var lcmOriginTimesteps = (1...max(1, Int(Float(originalStepCount) * (strength ?? 1)))).map {
@@ -97,7 +109,7 @@ public final class LCMScheduler: Scheduler {
         
         // 2. compute alphas, betas
         let alphaProdt = alphasCumProd[timeStep]
-        let alphaProdtPrev = alphasCumProd[max(0, prevTimestep)]
+        let alphaProdtPrev = prevTimestep >= 0 ? alphasCumProd[prevTimestep] : finalAlphaCumProd
         let betaProdt = 1 - alphaProdt
         let betaProdtPrev = 1 - alphaProdtPrev
         
