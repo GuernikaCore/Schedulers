@@ -180,6 +180,9 @@ public final class KDPM2DiscreteScheduler: Scheduler {
                     }
                 }
             }
+        case .sample:
+            // Not implemented yet in diffusers
+            predOriginalSample = output
         case .vPrediction:
             // * c_out + input * c_skip
             let sigmaPow: Float32 = pow(sigmaInput, 2) + 1

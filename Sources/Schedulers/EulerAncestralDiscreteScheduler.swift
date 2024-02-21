@@ -12,7 +12,7 @@ import RandomGenerator
 /// A scheduler used to compute a de-noised image
 ///
 ///  This implementation matches:
-///  [Hugging Face Diffusers EulerDiscreteScheduler](https://github.com/huggingface/diffusers/blob/main/src/diffusers/schedulers/scheduling_euler_discrete.py)
+///  [Hugging Face Diffusers EulerDiscreteScheduler](https://github.com/huggingface/diffusers/blob/main/src/diffusers/schedulers/scheduling_euler_ancestral_discrete.py)
 ///
 /// Euler scheduler (Algorithm 2) from Karras et al. (2022) https://arxiv.org/abs/2206.00364. . Based on the original
 /// k-diffusion implementation by Katherine Crowson:
@@ -140,6 +140,9 @@ public final class EulerAncestralDiscreteScheduler: Scheduler {
                     }
                 }
             }
+        case .sample:
+            // Not implemented yet in diffusers
+            predOriginalSample = output
         case .vPrediction:
             // * c_out + input * c_skip
             let sigmaPow: Float32 = pow(sigma, 2) + 1

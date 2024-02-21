@@ -133,6 +133,8 @@ public final class LCMScheduler: Scheduler {
                     }
                 }
             }
+        case .sample:
+            predOriginalSample = output
         case .vPrediction:
             predOriginalSample = [sample, output]
                 .weightedSum([Double(sqrtAlphaProdt), Double(sqrtBetaProdt)])

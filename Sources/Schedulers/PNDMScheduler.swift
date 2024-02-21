@@ -179,6 +179,8 @@ public final class PNDMScheduler: Scheduler {
                     }
                 }
             }
+        case .sample:
+            return modelOutput
         case .vPrediction:
             return MLShapedArray(unsafeUninitializedShape: modelOutput.shape) { scalars, _ in
                 assert(scalars.count == scalarCount)
@@ -232,7 +234,7 @@ public final class PNDMScheduler: Scheduler {
         
         var output = modelOutput
         switch predictionType {
-        case .epsilon:
+        case .epsilon, .sample:
             // Do nothing
             break
         case .vPrediction:

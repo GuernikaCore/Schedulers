@@ -141,6 +141,8 @@ public final class EulerDiscreteScheduler: Scheduler {
                     }
                 }
             }
+        case .sample:
+            predOriginalSample = output
         case .vPrediction:
             // * c_out + input * c_skip
             let sigmaPow: Float32 = pow(sigma, 2) + 1

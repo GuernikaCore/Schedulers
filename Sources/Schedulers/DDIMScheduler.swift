@@ -127,10 +127,10 @@ public final class DDIMScheduler: Scheduler {
         // "predicted x_0" of formula (12) from https://arxiv.org/pdf/2010.02502.pdf
         let predOriginalSample: MLShapedArray<Float32>
         let predEpsilon: MLShapedArray<Float32>
+        let alphaProdtPow = pow(alphaProdt, 0.5)
+        let betaProdtPow = pow(betaProdt, 0.5)
         switch predictionType {
         case .epsilon:
-            let alphaProdtPow = pow(alphaProdt, 0.5)
-            let betaProdtPow = pow(betaProdt, 0.5)
             predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in
@@ -141,9 +141,18 @@ public final class DDIMScheduler: Scheduler {
                 }
             }
             predEpsilon = output
+        case .sample:
+            predOriginalSample = output
+            predEpsilon = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
+                sample.withUnsafeShapedBufferPointer { sample, _, _ in
+                    predOriginalSample.withUnsafeShapedBufferPointer { output, _, _ in
+                        for i in 0..<scalarCount {
+                            scalars.initializeElement(at: i, to: (sample[i] - alphaProdtPow * output[i]) / betaProdtPow)
+                        }
+                    }
+                }
+            }
         case .vPrediction:
-            let alphaProdtPow = pow(alphaProdt, 0.5)
-            let betaProdtPow = pow(betaProdt, 0.5)
             predOriginalSample = MLShapedArray(unsafeUninitializedShape: output.shape) { scalars, _ in
                 sample.withUnsafeShapedBufferPointer { sample, _, _ in
                     output.withUnsafeShapedBufferPointer { output, _, _ in

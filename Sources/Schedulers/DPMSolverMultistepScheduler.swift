@@ -155,11 +155,13 @@ public final class DPMSolverMultistepScheduler: Scheduler {
                 modelOutput.withUnsafeShapedBufferPointer { modelOutput, _, _ in
                     sample.withUnsafeShapedBufferPointer { sample, _, _ in
                         for i in 0..<scalarCount {
-                            scalars.initializeElement(at: i, to: (sample[i] - modelOutput[i] * sigma_t) / alpha_t)
+                            scalars.initializeElement(at: i, to: (sample[i] - sigma_t * modelOutput[i]) / alpha_t)
                         }
                     }
                 }
             }
+        case .sample:
+            return modelOutput
         case .vPrediction:
             return MLShapedArray(unsafeUninitializedShape: modelOutput.shape) { scalars, _ in
                 assert(scalars.count == scalarCount)
